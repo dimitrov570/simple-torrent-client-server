@@ -70,7 +70,7 @@ public class CommandExecutorTest {
     @Test
     public void testUnregisterFilesWithValidArguments() {
         testCommandExecutor.execute("register username file1");
-        String expected = "Succesfully unregistered files: file1";
+        String expected = "Successfully unregistered files: file1";
         assertEquals(expected, testCommandExecutor.execute("unregister username file1"));
     }
 
