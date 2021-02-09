@@ -17,51 +17,63 @@ public class CommandExecutor {
     public String execute(String query) {
         String[] queryParts = query.trim().split("\s+", 2); //splitting into two parts
         return switch (queryParts[0]) {
-            case "register" -> registerFiles(queryParts[1]);
-            case "unregister" -> unregisterFiles(queryParts[1]);
+            case "register" -> registerFiles(queryParts);
+            case "unregister" -> unregisterFiles(queryParts);
             case "list-files" -> listFiles(queryParts); //to check if there are no more arguments
             default -> UNKNOWN_COMMAND;
         };
     }
 
-    private String registerFiles(String info) {
-        String arguments[] = info.split("\s+");
+    private String registerFiles(String[] info) {
+        if(info.length <= 1){
+            return UNKNOWN_COMMAND;
+        }
+
+        String[] arguments = info[1].split("\s+");
 
         if (arguments.length <= 1) {
             return UNKNOWN_COMMAND;
         }
 
-        if (!userFilesMap.containsKey(arguments[0])) {
-            userFilesMap.put(arguments[0], new HashSet<>());
+        String username = arguments[0];
+
+        if (!userFilesMap.containsKey(username)) {
+            userFilesMap.put(username, new HashSet<>());
         }
 
         StringBuilder response = new StringBuilder();
         response.append("Successfully registered files:");
 
         for (int i = 1; i < arguments.length; ++i) {
-            userFilesMap.get(arguments[0]).add(arguments[i]); //add file path for current user
+            userFilesMap.get(username).add(arguments[i]); //add file path for current user
             response.append(" " + arguments[i]);
         }
 
         return response.toString();
     }
 
-    private String unregisterFiles(String info) {
-        String arguments[] = info.split("\s+");
+    private String unregisterFiles(String[] info) {
+        if(info.length <= 1){
+            return UNKNOWN_COMMAND;
+        }
+
+        String[] arguments = info[1].split("\s+");
 
         if (arguments.length <= 1) {
             return UNKNOWN_COMMAND;
         }
 
-        if(!userFilesMap.containsKey(arguments[0])){
-            return "User <" + arguments[0] + "> has not registered any files";
+        String username = arguments[0];
+
+        if(!userFilesMap.containsKey(username)){
+            return "User <" + username + "> has not registered any files";
         }
 
         StringBuilder response = new StringBuilder();
         response.append("Successfully unregistered files:");
 
         for (int i = 1; i < arguments.length; ++i) {
-            if (!userFilesMap.get(arguments[0]).remove(arguments[i])) {
+            if (!userFilesMap.get(username).remove(arguments[i])) {
                 return "Cannot remove non-existing file";
             }
             response.append(" " + arguments[i]);
@@ -69,11 +81,13 @@ public class CommandExecutor {
         return response.toString();
     }
 
-    private String listFiles(String[] arguments) {
-        if (arguments.length != 1) {
+    private String listFiles(String[] info) {
+        if (info.length != 1) {
             return UNKNOWN_COMMAND;
         }
+
         StringBuilder result = new StringBuilder();
+
         for (Map.Entry<String, Set<String>> entry : userFilesMap.entrySet()) {
             String username = entry.getKey();
             for (String fileName : entry.getValue()) {
