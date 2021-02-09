@@ -1,2 +1,4 @@
-package client.communication;public class MapUpdater {
+package client.communication;
+
+public class MapUpdater {
 }
