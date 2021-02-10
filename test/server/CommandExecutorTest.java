@@ -3,6 +3,7 @@ package server;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -13,7 +14,7 @@ public class CommandExecutorTest {
 
     private static String UNKNOWN_COMMAND = "Unknown command";
 
-    private Map<String, IpPortCombination> userIpPortMap;
+    private Map<String, InetSocketAddress> userIpPortMap;
     private Map<String, Set<String>> userFilesMap;
     private CommandExecutor testCommandExecutor;
 

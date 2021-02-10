@@ -1,15 +1,16 @@
 package server;
 
+import java.net.InetSocketAddress;
 import java.util.*;
 
 public class CommandExecutor {
 
     private static String UNKNOWN_COMMAND = "Unknown command";
 
-    private Map<String, IpPortCombination> userIpPortMap;
+    private Map<String, InetSocketAddress> userIpPortMap;
     private Map<String, Set<String>> userFilesMap;
 
-    CommandExecutor(Map<String, IpPortCombination> userIpPortMap, Map<String, Set<String>> userFilesMap) {
+    CommandExecutor(Map<String, InetSocketAddress> userIpPortMap, Map<String, Set<String>> userFilesMap) {
         this.userIpPortMap = userIpPortMap;
         this.userFilesMap = userFilesMap;
     }
@@ -20,6 +21,7 @@ public class CommandExecutor {
             case "register" -> registerFiles(queryParts);
             case "unregister" -> unregisterFiles(queryParts);
             case "list-files" -> listFiles(queryParts); //to check if there are no more arguments
+            case "list-ports" -> userIpPortMapToString().toString();
             default -> UNKNOWN_COMMAND;
         };
     }
@@ -99,9 +101,9 @@ public class CommandExecutor {
 
     private StringBuilder userIpPortMapToString() {
         StringBuilder result = new StringBuilder();
-        for (Map.Entry<String, IpPortCombination> entry : userIpPortMap.entrySet()) {
+        for (Map.Entry<String, InetSocketAddress> entry : userIpPortMap.entrySet()) {
             result.append(entry.getKey() + " - ");
-            result.append(entry.getValue() + System.lineSeparator());
+            result.append(entry.getValue().toString().substring(1) + System.lineSeparator());
         }
         return result;
     }
