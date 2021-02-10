@@ -13,6 +13,7 @@ import static org.junit.Assert.*;
 public class CommandExecutorTest {
 
     private static String UNKNOWN_COMMAND = "Unknown command";
+    private static final InetSocketAddress DEFAULT_ISA = new InetSocketAddress("192.99.99.2",6666);
 
     private Map<String, InetSocketAddress> userIpPortMap;
     private Map<String, Set<String>> userFilesMap;
@@ -27,7 +28,7 @@ public class CommandExecutorTest {
 
     @Test
     public void testRegisterFilesWithNotEnoughArguments() {
-        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("register username"));
+        assertEquals(UNKNOWN_COMMAND + System.lineSeparator(), testCommandExecutor.execute("register username", null));
     }
 
     @Test
@@ -37,8 +38,8 @@ public class CommandExecutorTest {
         String[] user2files = {"u2f1"};
 
         //added leading and trailing whitespaces
-        testCommandExecutor.execute("  register " + usernames[0] + " " + user1files[0] + " " + user1files[1] + "\t\t");
-        testCommandExecutor.execute(" register   " + usernames[1] + "  " + user2files[0]);
+        testCommandExecutor.execute("  register " + usernames[0] + " " + user1files[0] + " " + user1files[1] + "\t\t", DEFAULT_ISA);
+        testCommandExecutor.execute(" register   " + usernames[1] + "  " + user2files[0], DEFAULT_ISA);
 
         assertTrue("Not containing expected user", userFilesMap.containsKey(usernames[0]));
         assertTrue("Not containing expected user", userFilesMap.containsKey(usernames[1]));
@@ -57,27 +58,27 @@ public class CommandExecutorTest {
 
     @Test
     public void testUnregisterFilesWithNonExistingUser() {
-        String expected = "User <non-existingUser> has not registered any files";
-        assertEquals(expected, testCommandExecutor.execute("unregister non-existingUser file1"));
+        String expected = "User <non-existingUser> has not registered any files" + System.lineSeparator();
+        assertEquals(expected, testCommandExecutor.execute("unregister non-existingUser file1", DEFAULT_ISA));
     }
 
     @Test
     public void testUnregisterFilesWithNonExistingFile() {
-        testCommandExecutor.execute("register username file1");
-        String expected = "Cannot remove non-existing file";
-        assertEquals(expected, testCommandExecutor.execute("unregister username invalidFilename"));
+        testCommandExecutor.execute("register username file1", DEFAULT_ISA);
+        String expected = "Cannot unregister non-existing files: invalidFilename" + System.lineSeparator();
+        assertEquals(expected, testCommandExecutor.execute("unregister username invalidFilename", DEFAULT_ISA));
     }
 
     @Test
     public void testUnregisterFilesWithValidArguments() {
-        testCommandExecutor.execute("register username file1");
-        String expected = "Successfully unregistered files: file1";
-        assertEquals(expected, testCommandExecutor.execute("unregister username file1"));
+        testCommandExecutor.execute("register username file1", DEFAULT_ISA);
+        String expected = "Successfully unregistered files: file1" + System.lineSeparator();
+        assertEquals(expected, testCommandExecutor.execute("unregister username file1", DEFAULT_ISA));
     }
 
     @Test
     public void testListFilesWithIllegalArguments() {
-        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("list-files asdfasdff"));
+        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("list-files asdfasdff", DEFAULT_ISA));
     }
 
     @Test
@@ -87,19 +88,32 @@ public class CommandExecutorTest {
         String[] user2files = {"u2f1"};
 
         //added leading and trailing whitespaces
-        testCommandExecutor.execute("  register " + usernames[0] + " " + user1files[0] + " " + user1files[1] + "\t\t");
-        testCommandExecutor.execute(" register   " + usernames[1] + "  " + user2files[0]);
+        testCommandExecutor.execute("  register " + usernames[0] + " " + user1files[0] + " " + user1files[1] + "\t\t", DEFAULT_ISA);
+        testCommandExecutor.execute(" register   " + usernames[1] + "  " + user2files[0], DEFAULT_ISA);
 
-        String response = testCommandExecutor.execute("\t list-files  "); //added leading and trailing whitespaces
+        String response = testCommandExecutor.execute("\t list-files  ", DEFAULT_ISA); //added leading and trailing whitespaces
         assertTrue("Not containing expected file", response.contains(usernames[0] + " : " + user1files[0]));
         assertTrue("Not containing expected file", response.contains(usernames[0] + " : " + user1files[1]));
         assertTrue("Not containing expected file", response.contains(usernames[1] + " : " + user2files[0]));
     }
 
     @Test
+    public void testListIpPortsWithValidArguments(){
+        testCommandExecutor.execute("register usr1 f1", DEFAULT_ISA);
+        testCommandExecutor.execute("register usr2 f2", DEFAULT_ISA);
+        String expected1 = "usr1 - " + DEFAULT_ISA.toString().substring(1);
+        String expected2 = "usr2 - " + DEFAULT_ISA.toString().substring(1);
+        String actual = testCommandExecutor.execute("list-ports", DEFAULT_ISA);
+
+        assertTrue(actual.contains(expected1));
+        assertTrue(actual.contains(expected2));
+    }
+
+    @Test
     public void testExecuteWithInvalidArguments(){
-        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("unknown"));
-        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("register"));
-        assertEquals(UNKNOWN_COMMAND, testCommandExecutor.execute("unregister"));
+        String expected = UNKNOWN_COMMAND + System.lineSeparator();
+        assertEquals(expected, testCommandExecutor.execute("unknown", DEFAULT_ISA));
+        assertEquals(expected, testCommandExecutor.execute("register", DEFAULT_ISA));
+        assertEquals(expected, testCommandExecutor.execute("unregister", DEFAULT_ISA));
     }
 }

@@ -3,6 +3,8 @@ package server;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -19,23 +21,21 @@ public class CommunicatorWithClients extends Thread {
     private static int serverPort;
     private boolean isStopped;
 
-    CommunicatorWithClients(CommandExecutor cmdExecutor, String serverHost, int serverPort){
+    CommunicatorWithClients(CommandExecutor cmdExecutor, String serverHost, int serverPort) {
         this.cmdExecutor = cmdExecutor;
         this.serverHost = serverHost;
         this.serverPort = serverPort;
         isStopped = false;
     }
 
-    public void run(){
+    public void run() {
         try (ServerSocketChannel serverSocketChannel = ServerSocketChannel.open()) {
             serverSocketChannel.bind(new InetSocketAddress(serverHost, serverPort));
             serverSocketChannel.configureBlocking(false);
             Selector selector = Selector.open();
             serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-
             ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
 
-            System.out.println("Started");
             while (!isStopped) {
                 int readyChannels = selector.selectNow();
                 if (readyChannels == 0) {
@@ -59,20 +59,24 @@ public class CommunicatorWithClients extends Thread {
                         buffer.get(byteArray);
                         String message = new String(byteArray, "UTF-8");
                         message = message.substring(0, message.lastIndexOf(System.lineSeparator()));
-
-                        String response = cmdExecutor.execute(message);
-                        writeToBuffer(sc, buffer, response + System.lineSeparator());
+                        if(message.equals("disconnect")){
+                            writeToBuffer(sc, buffer, "Disconnected");
+                            sc.close();
+                            continue;
+                        }
+                        InetSocketAddress iaddr = (InetSocketAddress) sc.getRemoteAddress();
+                        String response = cmdExecutor.execute(message, iaddr);
+                        writeToBuffer(sc, buffer, response);
                     } else if (key.isAcceptable()) {
                         acceptChannel(selector, key);
                     }
                     keyIterator.remove();
                 }
             }
-            System.out.println("done");
-            //this method disconnects connected users and sends them proper message
-            //disconnectAllUsers(selector, buffer);
+        } catch (SocketException e) {
+            e.printStackTrace();
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            e.printStackTrace();
         }
     }
 
@@ -100,7 +104,7 @@ public class CommunicatorWithClients extends Thread {
     }
 
 
-    public void terminate(){
+    public void terminate() {
         isStopped = true;
     }
 }

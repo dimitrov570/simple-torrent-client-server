@@ -15,23 +15,23 @@ public class CommandExecutor {
         this.userFilesMap = userFilesMap;
     }
 
-    public String execute(String query) {
+    public String execute(String query, InetSocketAddress scInetAddress) {
         String[] queryParts = query.trim().split("\s+", 2); //splitting into two parts
         return switch (queryParts[0]) {
-            case "register" -> registerFiles(queryParts);
-            case "unregister" -> unregisterFiles(queryParts);
+            case "register" -> registerFiles(queryParts, scInetAddress) + System.lineSeparator();
+            case "unregister" -> unregisterFiles(queryParts) + System.lineSeparator();
             case "list-files" -> listFiles(queryParts); //to check if there are no more arguments
-            case "list-ports" -> userIpPortMapToString().toString();
-            default -> UNKNOWN_COMMAND;
+            case "list-ports" -> userIpPortMapToString(queryParts);
+            default -> UNKNOWN_COMMAND + System.lineSeparator();
         };
     }
 
-    private String registerFiles(String[] info) {
-        if(info.length <= 1){
+    private String registerFiles(String[] queryParts, InetSocketAddress scInetAddress) {
+        if (queryParts.length <= 1) {
             return UNKNOWN_COMMAND;
         }
 
-        String[] arguments = info[1].split("\s+");
+        String[] arguments = queryParts[1].split("\s+");
 
         if (arguments.length <= 1) {
             return UNKNOWN_COMMAND;
@@ -43,23 +43,37 @@ public class CommandExecutor {
             userFilesMap.put(username, new HashSet<>());
         }
 
-        StringBuilder response = new StringBuilder();
-        response.append("Successfully registered files:");
+        userIpPortMap.put(username, scInetAddress);
+
+        boolean hasAlreadyExistingFiles = false;
+
+        StringBuilder responseSuccess = new StringBuilder();
+        StringBuilder responseAlreadyExists = new StringBuilder();
+        responseSuccess.append("Successfully registered files:");
+        responseAlreadyExists.append("Already existing files: ");
 
         for (int i = 1; i < arguments.length; ++i) {
-            userFilesMap.get(username).add(arguments[i]); //add file path for current user
-            response.append(" " + arguments[i]);
+            if (!userFilesMap.get(username).contains(arguments[i])) {
+                userFilesMap.get(username).add(arguments[i]); //add file path for current user
+                responseSuccess.append(" " + arguments[i]);
+            } else {
+                hasAlreadyExistingFiles = true;
+                responseAlreadyExists.append(" " + arguments[i]);
+            }
         }
 
-        return response.toString();
+        if (hasAlreadyExistingFiles) {
+            return responseSuccess.toString() + System.lineSeparator() + responseAlreadyExists.toString();
+        }
+        return responseSuccess.toString();
     }
 
-    private String unregisterFiles(String[] info) {
-        if(info.length <= 1){
+    private String unregisterFiles(String[] queryParts) {
+        if (queryParts.length <= 1) {
             return UNKNOWN_COMMAND;
         }
 
-        String[] arguments = info[1].split("\s+");
+        String[] arguments = queryParts[1].split("\s+");
 
         if (arguments.length <= 1) {
             return UNKNOWN_COMMAND;
@@ -67,24 +81,42 @@ public class CommandExecutor {
 
         String username = arguments[0];
 
-        if(!userFilesMap.containsKey(username)){
+        if (!userFilesMap.containsKey(username) || userFilesMap.get(username).isEmpty()) {
             return "User <" + username + "> has not registered any files";
         }
 
-        StringBuilder response = new StringBuilder();
-        response.append("Successfully unregistered files:");
+        boolean hasNonExisting = false;
+        boolean hasExisting = false;
+        StringBuilder responseSuccess = new StringBuilder();
+        StringBuilder responseNotExisting = new StringBuilder();
+        responseSuccess.append("Successfully unregistered files:");
+        responseNotExisting.append("Cannot unregister non-existing files:");
 
         for (int i = 1; i < arguments.length; ++i) {
             if (!userFilesMap.get(username).remove(arguments[i])) {
-                return "Cannot remove non-existing file";
+                hasNonExisting = true;
+                responseNotExisting.append(" " + arguments[i]);
+            } else {
+                hasExisting = true;
+                responseSuccess.append(" " + arguments[i]);
             }
-            response.append(" " + arguments[i]);
         }
-        return response.toString();
+
+        if (hasExisting) {
+            if (hasNonExisting) {
+                return responseSuccess + System.lineSeparator() + responseNotExisting;
+            } else {
+                return responseSuccess.toString();
+            }
+        } else if (hasNonExisting) {
+            return responseNotExisting.toString();
+        }
+
+        return "Nothing to remove"; //will never get here
     }
 
-    private String listFiles(String[] info) {
-        if (info.length != 1) {
+    private String listFiles(String[] queryParts) {
+        if (queryParts.length != 1) {
             return UNKNOWN_COMMAND;
         }
 
@@ -99,13 +131,17 @@ public class CommandExecutor {
         return result.toString();
     }
 
-    private StringBuilder userIpPortMapToString() {
+    private String userIpPortMapToString(String[] queryParts) {
+        if (queryParts.length != 1) {
+            return UNKNOWN_COMMAND;
+        }
+
         StringBuilder result = new StringBuilder();
         for (Map.Entry<String, InetSocketAddress> entry : userIpPortMap.entrySet()) {
             result.append(entry.getKey() + " - ");
             result.append(entry.getValue().toString().substring(1) + System.lineSeparator());
         }
-        return result;
+        return result.toString();
     }
 
 }

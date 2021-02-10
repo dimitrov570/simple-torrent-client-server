@@ -38,7 +38,7 @@ public class ClientUpdater extends Thread {
         System.out.println("sleeping...");
         Thread.sleep(4000);
         System.out.println("started");
-        System.out.println(test.execute("list-ports"));
+        System.out.println(test.execute("list-ports", null));
     }
 
 }
