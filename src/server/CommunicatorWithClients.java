@@ -15,7 +15,7 @@ import java.util.Set;
 
 public class CommunicatorWithClients extends Thread {
 
-    private static final int BUFFER_SIZE = 4096;
+    private static final int BUFFER_SIZE = 32768;
     private CommandExecutor cmdExecutor;
     private static String serverHost;
     private static int serverPort;

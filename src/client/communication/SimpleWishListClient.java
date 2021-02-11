@@ -1,45 +1,32 @@
 package client.communication;
 
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Queue;
 import java.util.Scanner;
 
-public class CommunicatorWithServer extends Thread {
+
+public class SimpleWishListClient {
+
     private static final int BUFFER_SIZE = 512;
-    private ByteBuffer buffer;
-    private Queue<String> serverQueries;
-    private int serverPort;
-    private String serverHost;
-    private InetSocketAddress serverInetSocketAddress;
+    private static final int SERVER_PORT = 7777;
+    private static final String SERVER_HOST = "localhost";
+    private static ByteBuffer buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
 
-    public CommunicatorWithServer(Queue<String> serverQueries, String serverHost, int serverPort) {
-        this.serverQueries = serverQueries;
-        this.serverHost = serverHost;
-        this.serverPort = serverPort;
-        buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
-    }
 
-    public InetSocketAddress getServerInetSocketAddress(){
-        return serverInetSocketAddress;
-    }
+    public static void main(String[] args) {
 
-    public void run() {
         try (SocketChannel socketChannel = SocketChannel.open();
              Scanner scanner = new Scanner(System.in)) {
-            socketChannel.connect(new InetSocketAddress(serverHost, serverPort));
-            serverInetSocketAddress = (InetSocketAddress) socketChannel.socket().getLocalSocketAddress();
+            socketChannel.connect(new InetSocketAddress(SERVER_HOST, SERVER_PORT));
+
             System.out.println("Connected to the server.");
 
             while (true) {
-                String message = serverQueries.poll();
-                if(message == null){
-                    Thread.sleep(100);
-                    continue;
-                }
-                message = message.trim() + System.lineSeparator();
+                System.out.print("Enter message: ");
+                String message = scanner.nextLine() + System.lineSeparator(); // read a line from the console
 
                 buffer.clear(); // switch to writing mode
                 buffer.put(message.getBytes()); // buffer fill
@@ -61,10 +48,9 @@ public class CommunicatorWithServer extends Thread {
                     break;
                 }
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             System.err.println("There is a problem with the network communication");
             e.printStackTrace();
         }
     }
-
 }
