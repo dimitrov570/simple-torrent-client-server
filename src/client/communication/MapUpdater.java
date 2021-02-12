@@ -1,38 +1,36 @@
 package client.communication;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Scanner;
-
-import static java.nio.file.StandardOpenOption.CREATE;
+import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MapUpdater extends Thread {
-
+    private static final int SLEEP_TIME = 100;
+    private Logger logger;
     private static final int BUFFER_SIZE = 32768;
     private ByteBuffer buffer;
-    private Map<String, String> usersIpPortsMap;
+    private ConcurrentMap<String, InetSocketAddress> usersIpPortsMap;
     private String backupFileName;
     private String serverHost;
     private int serverPort;
+    boolean isStopped;
 
-    public MapUpdater(Map<String, String> usersIpPortsMap, String serverHost, int serverPort) {
+    public MapUpdater(ConcurrentMap<String, InetSocketAddress> usersIpPortsMap, String serverHost, int serverPort) {
         super("map-updater");
+        this.logger = Logger.getLogger("mapUpdater");
         this.usersIpPortsMap = usersIpPortsMap;
         this.serverHost = serverHost;
         this.serverPort = serverPort;
         buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+        isStopped = false;
     }
 
     public void run() {
@@ -42,17 +40,13 @@ public class MapUpdater extends Thread {
             var serverInetSocketAddress = (InetSocketAddress) socketChannel.socket().getLocalSocketAddress();
             backupFileName = serverInetSocketAddress.toString().replace(":", "-");
             backupFileName = backupFileName.substring(1) + ".txt";
-            System.out.println("Map updater connected --- " + backupFileName);
+            //System.out.println("Map updater connected --- " + backupFileName);
             socketChannel.configureBlocking(false);
 
             String message = "list-ports" + System.lineSeparator();
 
-            while (true) {
-                buffer.clear(); // switch to writing mode
-                buffer.put(message.getBytes()); // buffer fill
-
-                buffer.flip(); // switch to reading mode
-                socketChannel.write(buffer); // buffer drain
+            while (!isStopped) {
+                writeToBuffer(socketChannel, buffer, message);
 
                 buffer.clear(); // switch to writing mode
                 socketChannel.read(buffer); // buffer fill
@@ -62,11 +56,34 @@ public class MapUpdater extends Thread {
                 buffer.get(byteArray);
                 String reply = new String(byteArray, "UTF-8"); // buffer drain
                 updateMap(reply);
-                Thread.sleep(30000);
+                Thread.sleep(SLEEP_TIME);
             }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("There is a problem with the network communication");
-            e.printStackTrace();
+            writeToBuffer(socketChannel, buffer, "disconnect" + System.lineSeparator());
+            buffer.clear(); // switch to writing mode
+            socketChannel.read(buffer); // buffer fill
+            Files.deleteIfExists(Path.of(backupFileName));
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error while sleep()", e);
+        } catch (InterruptedException e) {
+            logger.log(Level.SEVERE, "Error with network communication", e);
+        }
+    }
+
+    public void terminate() {
+        isStopped = true;
+    }
+
+    private void writeToBuffer(SocketChannel sc, ByteBuffer buffer, String message) {
+        try {
+            if (!sc.isConnected()) {
+                return;
+            }
+            buffer.clear();
+            buffer.put(message.getBytes("UTF-8"));
+            buffer.flip();
+            sc.write(buffer);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -78,10 +95,24 @@ public class MapUpdater extends Thread {
         Files.write(path, update.getBytes());
         String[] lines = update.split(System.lineSeparator());
         String[] lineParts;
+        usersIpPortsMap.clear();
         for (String line : lines) {
             lineParts = line.split(" - ");
-            usersIpPortsMap.put(lineParts[0], lineParts[1]);
+            if (lineParts.length == 2) {
+                InetSocketAddress addr = createInetSocketAddress(lineParts[1]);
+                if (addr != null) {
+                    usersIpPortsMap.put(lineParts[0], addr);
+                }
+            }
         }
     }
 
+    private InetSocketAddress createInetSocketAddress(String str) {
+        String[] parts = str.split(":");
+        if (parts.length != 2) {
+            return null;
+        }
+        return new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+
+    }
 }

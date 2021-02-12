@@ -2,15 +2,16 @@ package server;
 
 import java.net.InetSocketAddress;
 import java.util.*;
+import java.util.concurrent.ConcurrentMap;
 
 public class CommandExecutor {
 
     private static String UNKNOWN_COMMAND = "Unknown command";
 
-    private Map<String, InetSocketAddress> userIpPortMap;
-    private Map<String, Set<String>> userFilesMap;
+    private ConcurrentMap<String, InetSocketAddress> userIpPortMap;
+    private ConcurrentMap<String, Set<String>> userFilesMap;
 
-    CommandExecutor(Map<String, InetSocketAddress> userIpPortMap, Map<String, Set<String>> userFilesMap) {
+    CommandExecutor(ConcurrentMap<String, InetSocketAddress> userIpPortMap, ConcurrentMap<String, Set<String>> userFilesMap) {
         this.userIpPortMap = userIpPortMap;
         this.userFilesMap = userFilesMap;
     }
@@ -22,6 +23,7 @@ public class CommandExecutor {
             case "unregister" -> unregisterFiles(queryParts) + System.lineSeparator();
             case "list-files" -> listFiles(queryParts); //to check if there are no more arguments
             case "list-ports" -> userIpPortMapToString(queryParts);
+            case "disconnect" -> disconnectUser(queryParts, scInetAddress) + System.lineSeparator();
             default -> UNKNOWN_COMMAND + System.lineSeparator();
         };
     }
@@ -45,6 +47,7 @@ public class CommandExecutor {
 
         userIpPortMap.put(username, scInetAddress);
 
+        boolean hasRegistered = false;
         boolean hasAlreadyExistingFiles = false;
 
         StringBuilder responseSuccess = new StringBuilder();
@@ -54,6 +57,7 @@ public class CommandExecutor {
 
         for (int i = 1; i < arguments.length; ++i) {
             if (!userFilesMap.get(username).contains(arguments[i])) {
+                hasRegistered = true;
                 userFilesMap.get(username).add(arguments[i]); //add file path for current user
                 responseSuccess.append(" " + arguments[i]);
             } else {
@@ -63,9 +67,15 @@ public class CommandExecutor {
         }
 
         if (hasAlreadyExistingFiles) {
-            return responseSuccess.toString() + System.lineSeparator() + responseAlreadyExists.toString();
+            if (hasRegistered) {
+                return responseSuccess.toString() + System.lineSeparator() + responseAlreadyExists.toString();
+            } else {
+                return responseAlreadyExists.toString();
+            }
+        } else if (hasRegistered) {
+            return responseSuccess.toString();
         }
-        return responseSuccess.toString();
+        return "Nothing to register";
     }
 
     private String unregisterFiles(String[] queryParts) {
@@ -142,6 +152,21 @@ public class CommandExecutor {
             result.append(entry.getValue().toString().substring(1) + System.lineSeparator());
         }
         return result.toString();
+    }
+
+    private String disconnectUser(String[] queryParts, InetSocketAddress inetSocketAddress) {
+        if (queryParts.length != 1) {
+            return UNKNOWN_COMMAND;
+        }
+        if (userIpPortMap.containsValue(inetSocketAddress)) {
+            for (Map.Entry<String, InetSocketAddress> entry : userIpPortMap.entrySet()) {
+                if (entry.getValue().equals(inetSocketAddress)) {
+                    userIpPortMap.remove(entry.getKey());
+                    userFilesMap.remove(entry.getKey());
+                }
+            }
+        }
+        return "Disconnected successfully";
     }
 
 }

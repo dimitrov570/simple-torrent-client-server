@@ -7,22 +7,24 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static org.junit.Assert.*;
 
 public class CommandExecutorTest {
 
     private static String UNKNOWN_COMMAND = "Unknown command";
-    private static final InetSocketAddress DEFAULT_ISA = new InetSocketAddress("192.99.99.2",6666);
+    private static final InetSocketAddress DEFAULT_ISA = new InetSocketAddress("192.99.99.2", 6666);
 
-    private Map<String, InetSocketAddress> userIpPortMap;
-    private Map<String, Set<String>> userFilesMap;
+    private ConcurrentMap<String, InetSocketAddress> userIpPortMap;
+    private ConcurrentMap<String, Set<String>> userFilesMap;
     private CommandExecutor testCommandExecutor;
 
     @Before
     public void setUp() {
-        userFilesMap = new HashMap<>();
-        userIpPortMap = new HashMap<>();
+        userFilesMap = new ConcurrentHashMap<>();
+        userIpPortMap = new ConcurrentHashMap<>();
         testCommandExecutor = new CommandExecutor(userIpPortMap, userFilesMap);
     }
 
@@ -98,7 +100,7 @@ public class CommandExecutorTest {
     }
 
     @Test
-    public void testListIpPortsWithValidArguments(){
+    public void testListIpPortsWithValidArguments() {
         testCommandExecutor.execute("register usr1 f1", DEFAULT_ISA);
         testCommandExecutor.execute("register usr2 f2", DEFAULT_ISA);
         String expected1 = "usr1 - " + DEFAULT_ISA.toString().substring(1);
@@ -110,7 +112,15 @@ public class CommandExecutorTest {
     }
 
     @Test
-    public void testExecuteWithInvalidArguments(){
+    public void testDisconnectUserWithValidArguments() {
+        String username = "username";
+        testCommandExecutor.execute("  register " + username + " f1" + "\t\t", DEFAULT_ISA);
+        testCommandExecutor.execute("disconnect", DEFAULT_ISA);
+        assertTrue("No users should be present in map", userIpPortMap.isEmpty());
+    }
+
+    @Test
+    public void testExecuteWithInvalidArguments() {
         String expected = UNKNOWN_COMMAND + System.lineSeparator();
         assertEquals(expected, testCommandExecutor.execute("unknown", DEFAULT_ISA));
         assertEquals(expected, testCommandExecutor.execute("register", DEFAULT_ISA));

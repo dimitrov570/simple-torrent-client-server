@@ -3,7 +3,6 @@ package server;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -12,9 +11,12 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CommunicatorWithClients extends Thread {
 
+    private Logger logger;
     private static final int BUFFER_SIZE = 32768;
     private CommandExecutor cmdExecutor;
     private static String serverHost;
@@ -22,6 +24,7 @@ public class CommunicatorWithClients extends Thread {
     private boolean isStopped;
 
     CommunicatorWithClients(CommandExecutor cmdExecutor, String serverHost, int serverPort) {
+        logger = Logger.getLogger("torrentServerCommunicationWithClients");
         this.cmdExecutor = cmdExecutor;
         this.serverHost = serverHost;
         this.serverPort = serverPort;
@@ -43,13 +46,15 @@ public class CommunicatorWithClients extends Thread {
                 }
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
                 Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-
+                int numberOfBytesRead = -1;
                 while (keyIterator.hasNext()) {
                     SelectionKey key = keyIterator.next();
                     if (key.isReadable()) {
                         SocketChannel sc = (SocketChannel) key.channel();
                         buffer.clear();
-                        int numberOfBytesRead = sc.read(buffer);
+                        if (sc.isOpen()) {
+                            numberOfBytesRead = sc.read(buffer);
+                        }
                         if (numberOfBytesRead < 0) {
                             sc.close();
                             continue;
@@ -58,15 +63,14 @@ public class CommunicatorWithClients extends Thread {
                         byte[] byteArray = new byte[buffer.remaining()];
                         buffer.get(byteArray);
                         String message = new String(byteArray, "UTF-8");
-                        message = message.substring(0, message.lastIndexOf(System.lineSeparator()));
-                        if(message.equals("disconnect")){
-                            writeToBuffer(sc, buffer, "Disconnected");
-                            sc.close();
-                            continue;
-                        }
+                        message = message.substring(0, message.indexOf(System.lineSeparator()));
                         InetSocketAddress iaddr = (InetSocketAddress) sc.getRemoteAddress();
                         String response = cmdExecutor.execute(message, iaddr);
                         writeToBuffer(sc, buffer, response);
+                        if (response.equals("Disconnected successfully" + System.lineSeparator())) {
+                            sc.close();
+                            continue;
+                        }
                     } else if (key.isAcceptable()) {
                         acceptChannel(selector, key);
                     }
@@ -74,9 +78,9 @@ public class CommunicatorWithClients extends Thread {
                 }
             }
         } catch (SocketException e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Socket error", e);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "IO error", e);
         }
     }
 
